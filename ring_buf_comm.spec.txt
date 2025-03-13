@@ -1,0 +1,31 @@
+Okay, Bob. I'm going to go through and address each of your observations. I'm not sure how I'm going to reference the observation, though. Let's give it a try and see how it works out.
+1. Buffer Overflow - Let's address this for RX then TX
+  a. RX - Overwrite the oldest data in the buffer. Set a flag that can be polled by consumer.
+  b. TX - Add no data to the ring-buffer. Return a `size_t* write_len` set to zero.
+2. We suck it up and work through the logic and position accounting to provide the appearance of a linear buffer. We just create a way for us to perform string comparison. If you think a rolling window aproach is simpler, then we implement it.
+3. I need to update the definition of the read(...) function:
+```
+bool read(char * rcvr, size_t rcvr_len, const char * const terminator, size_t* read_len){...}
+```
+For me it seems more natural to have the terminator toward the end of the parameter list. We have the terminator followed by how many bytes were actually copied into the rcvr buffer.
+Now, the rules of reading:
+  a. Copy chars from RX ring buffer into rcvr.
+  b. Stop copying when:
+    i. Terminator is copied into rcvr buffer. 
+      1) Set ring buffer start index to first character _after_ terminator.
+      2) Return true. 
+    ii. rcvr_len characters have been written into the rcvr buffer.
+      . Set ring buffer start index to first character _after_ last character copied into rcvr buffer. 
+      ii. Return false. 
+  3. Implement a callback. (Let's assume all the normal check for NULL, etc. We're smart. We will just code these as the natural habit of 30 years of programming experience.)
+    a. Provide a function to set an RX buffer fill size (in characters) when the callback it triggered.
+    b. Provide a function to set the current line terminator for the callback trigger. 
+    c. Callback when the line terminator is encountered.
+    d. Define a default callback terminator of '\n'.
+    e. Define a default RX buffer fill trigger size equal to the ring buffer size.
+  4. RX buffer overflow
+    a. Implement writing overflow data into the RX ring buffer.
+    b. Set the overflow flag.
+    c. It must be polled by the RX consumer before a call to the read(...) function (we might consider passing this back through a new `bool * overflow` parameter in the read(...) function).
+    d. Reset overflow flag after a data read successfully copies data out of the ring buffer.
+4. & 5. I believe I have addressed these observations in the details of 3.
